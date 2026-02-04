@@ -431,6 +431,100 @@ async def get_phone_details(model_name: str):
     return {"phone": specs}
 
 
+@app.get("/test/openai", tags=["Testing"])
+async def test_openai_connection():
+    """Test if OpenAI API connection works and returns detailed diagnostics."""
+    import os
+    from dotenv import load_dotenv
+    
+    load_dotenv()
+    
+    api_key = os.getenv('OPENAI_API_KEY')
+    
+    if not api_key:
+        return {
+            "status": "error",
+            "message": "OPENAI_API_KEY not set in .env file",
+            "next_steps": [
+                "1. Add OPENAI_API_KEY to .env file",
+                "2. Restart the server",
+                "3. Try again"
+            ]
+        }
+    
+    if not api_key.startswith('sk-'):
+        return {
+            "status": "error",
+            "message": "OPENAI_API_KEY format looks invalid (should start with 'sk-')",
+            "key_preview": f"{api_key[:10]}...",
+            "next_steps": ["Check your API key format"]
+        }
+    
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "Say 'OK'"}],
+            max_tokens=10
+        )
+        
+        return {
+            "status": "success",
+            "message": "✓ OpenAI API is working perfectly!",
+            "model": "gpt-4o-mini",
+            "response": response.choices[0].message.content,
+            "key_preview": f"{api_key[:20]}...",
+            "next_steps": ["Your /ask endpoint should now work"]
+        }
+        
+    except Exception as e:
+        error_str = str(e)
+        
+        if "insufficient_quota" in error_str.lower() or "quota" in error_str.lower():
+            return {
+                "status": "error",
+                "message": "❌ OpenAI API Quota Exceeded",
+                "error_code": "insufficient_quota",
+                "details": "Your OpenAI account has no credits or has exceeded quota",
+                "key_preview": f"{api_key[:20]}...",
+                "next_steps": [
+                    "1. Go to: https://platform.openai.com/account/billing/overview",
+                    "2. Check your quota and billing status",
+                    "3. Add a payment method if needed",
+                    "4. Wait a few minutes for quota to reset",
+                    "5. Try again"
+                ]
+            }
+        elif "401" in error_str or "invalid" in error_str.lower():
+            return {
+                "status": "error",
+                "message": "❌ Invalid API Key",
+                "error_code": "invalid_api_key",
+                "details": "The API key is invalid or expired",
+                "key_preview": f"{api_key[:20]}...",
+                "next_steps": [
+                    "1. Go to: https://platform.openai.com/api-keys",
+                    "2. Create a new API key or use an existing valid one",
+                    "3. Update OPENAI_API_KEY in .env",
+                    "4. Restart the server",
+                    "5. Try again"
+                ]
+            }
+        else:
+            return {
+                "status": "error",
+                "message": f"❌ OpenAI API Error",
+                "error": error_str[:200],
+                "key_preview": f"{api_key[:20]}...",
+                "next_steps": [
+                    "Check the error details above",
+                    "Visit: https://platform.openai.com/docs/guides/error-codes",
+                ]
+            }
+
+
 if __name__ == "__main__":
     import uvicorn
     
