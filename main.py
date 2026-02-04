@@ -42,7 +42,72 @@ class AdviceResponse(BaseModel):
 
 
 
+#AGENT 1: DATA EXTRACTOR
 
+def extract_phone_model(question: str) -> str:
+    
+    print(f"[AGENT 1] Extracting phone model from: {question}")
+    
+    # Common Samsung phone patterns
+    patterns = [
+        r'Galaxy\s+S\d+(?:\s+Ultra)?',  
+        r'Galaxy\s+Z\s+(?:Fold|Flip)\s+\d+',  
+        r'Galaxy\s+A\d+',  
+        r'Galaxy\s+Tab\s+S\d+',  
+        r'S\d+\s+Ultra', 
+        r'Z\s+(?:Fold|Flip)', 
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, question, re.IGNORECASE)
+        if match:
+            model = match.group(0).strip()
+            print(f"[AGENT 1] ✓ Detected: {model}")
+            return model
+    
+    print("[AGENT 1] ⚠ No phone model detected")
+    return ""
+
+def fetch_phone_specs(model_name: str) -> dict:
+    print(f"[AGENT 1] Querying database for: {model_name}")
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # SQL query: ILIKE for case-insensitive search
+        query = """
+        SELECT id, model_name, display, battery, camera, ram, storage, price
+        FROM smartphones
+        WHERE model_name ILIKE %s
+        LIMIT 1;
+        """
+        
+        cursor.execute(query, (f'%{model_name}%',))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if result:
+            specs = {
+                'id': result[0],
+                'model_name': result[1],
+                'display': result[2],
+                'battery': result[3],
+                'camera': result[4],
+                'ram': result[5],
+                'storage': result[6],
+                'price': result[7]
+            }
+            print(f"[AGENT 1] ✓ Found: {specs['model_name']}")
+            return specs
+        else:
+            print(f"[AGENT 1] ✗ Phone not found in database")
+            return None
+            
+    except psycopg2.OperationalError as e:
+        print(f"[AGENT 1] ✗ Database error: {e}")
+        return None
 
 
 
@@ -104,9 +169,6 @@ async def ask_advisor(query: UserQuery):
                    "Please try another model or check the model name."
         )
     
-    # AGENT 2: Generate review
-    review = call_llm_api(specs, query.question)
-    
     # Prepare response
     response = AdviceResponse(
         phone_model=specs['model_name'],
@@ -118,7 +180,6 @@ async def ask_advisor(query: UserQuery):
             'storage': specs['storage'],
             'price': specs['price']
         },
-        review=review,
         status="success"
     )
     
