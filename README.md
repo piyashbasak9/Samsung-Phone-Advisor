@@ -1,271 +1,209 @@
-# Samsung Phone Advisor API
+# Samsung Phone Advisor
 
-A FastAPI-based REST API for Samsung phone recommendations powered by FREE Groq LLM (or OpenAI).
+An intelligent AI-powered backend system that provides personalized Samsung phone recommendations using Google's Gemini AI and FastAPI.
 
-## Key Features
+## Features
 
-- 🚀 **Multi-LLM Support**: Groq (FREE) or OpenAI (PAID)
-- 💰 **Free Option**: Groq API requires NO credit card
-- ⚡ **Fast**: Groq is extremely fast (no credits needed)
-- 🤖 **AI-Powered**: LLM-generated responses only (no hardcoded answers)
-- 📱 **Samsung Focus**: Extract phone models and provide recommendations
+- **AI-Powered Recommendations**: Uses Google Gemini 2.5 Flash to analyze user queries and provide intelligent phone recommendations
+- **Phone Database**: PostgreSQL database storing Samsung phone specifications (display, camera, battery, storage, price, color)
+- **Regex-Based Model Extraction**: Intelligent extraction of phone model names from user queries
+- **RESTful API**: FastAPI-based backend with clear endpoints for phone queries and recommendations
+- **Web Scraping**: Data collection capabilities with BeautifulSoup for phone information gathering
+- **Environment Management**: Secure configuration using .env files
 
-## Project Setup
+## Tech Stack
+
+- **Backend Framework**: FastAPI, Uvicorn
+- **Database**: PostgreSQL with psycopg2
+- **AI**: Google Generative AI (Gemini 2.5 Flash)
+- **Web Scraping**: BeautifulSoup, Requests
+- **Validation**: Pydantic
+- **Configuration**: python-dotenv
+
+## Project Structure
+
+```
+├── main.py              # FastAPI application & endpoints
+├── db_setup.py          # Database configuration & queries
+├── scraper.py           # Web scraping utilities
+├── setup.py             # Package setup configuration
+├── requirements.txt     # Python dependencies
+└── README.md            # This file
+```
+
+## Installation
 
 ### Prerequisites
-- Python 3.8 or higher
-- pip (Python package installer)
 
-### Installation
+- Python 3.8+
+- PostgreSQL database
+- Google Generative AI API key
 
-1. **Create a virtual environment:**
+### Setup Steps
+
+1. **Clone the repository**
    ```bash
-   python -m venv venv
+   git clone <repository-url>
+   cd Samsung-Phone-Advisor
    ```
 
-2. **Activate the virtual environment:**
-   - On Linux/macOS:
-     ```bash
-     source venv/bin/activate
-     ```
-   - On Windows:
-     ```bash
-     venv\Scripts\activate
-     ```
+2. **Create virtual environment**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
 
-3. **Install dependencies:**
+3. **Install dependencies**
    ```bash
    pip install -r requirements.txt
    ```
 
-### Running the Application
+4. **Configure environment variables**
+   Create a `.env` file in the project root:
+   ```
+   GOOGLE_API_KEY=your_google_api_key_here
+   DB_NAME=samsung_phones
+   DB_USER=your_db_user
+   DB_PASSWORD=your_db_password
+   DB_HOST=localhost
+   ```
+
+5. **Setup database**
+   ```bash
+   python db_setup.py
+   ```
+
+## Usage
+
+### Start the Server
 
 ```bash
-python main.py
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 The API will be available at `http://localhost:8000`
 
-## 🆓 Using FREE Groq LLM (Recommended)
+### API Documentation
 
-Groq is **completely free** - no credit card needed!
+- **Swagger UI**: `http://localhost:8000/docs`
+- **ReDoc**: `http://localhost:8000/redoc`
 
-### Step 1: Get Groq API Key
+### Example Endpoints
 
-1. Go to: https://console.groq.com/keys
-2. Sign up (free, takes 30 seconds)
-3. Create API key (it starts with `gsk_`)
-4. Copy the key
-
-### Step 2: Configure `.env`
-
-Edit `.env` file and add your Groq key:
-
-```env
-# LLM Provider Selection
-LLM_PROVIDER=groq
-
-# Groq API Configuration (FREE)
-GROQ_API_KEY=gsk_YOUR_KEY_HERE
-GROQ_MODEL=mixtral-8x7b-32768
-```
-
-### Step 3: Test Connection
-
+#### Get All Phones
 ```bash
-# Test Groq connection
-curl http://localhost:8000/test/openai
+GET /phones
 ```
 
-You should see: `"status": "success"`
-
-### Step 4: Use the `/ask` endpoint
-
+#### Get Phone by Model
 ```bash
-curl -X POST http://localhost:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"question":"Tell me about Galaxy S24 Ultra camera"}'
+GET /phones/{model_name}
 ```
 
-Now you'll get AI-generated responses using **FREE Groq**! ✅
-
-## 💳 Using Paid OpenAI (Optional)
-
-If you prefer OpenAI instead:
-
-### Step 1: Get OpenAI API Key
-
-1. Go to: https://platform.openai.com/api-keys
-2. Create API key
-3. Add payment method (credit/debit card)
-4. Copy your key
-
-### Step 2: Configure `.env`
-
-```env
-# Switch to OpenAI
-LLM_PROVIDER=openai
-
-# OpenAI Configuration
-OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
-OPENAI_MODEL=gpt-4o-mini
-```
-
-### Step 3: Test Connection
-
+#### Get AI Recommendation
 ```bash
-curl http://localhost:8000/test/openai
-```
-
-## 📚 API Endpoints
-
-### `/ask` - Main Advisor Endpoint
-Provides Samsung phone recommendations using LLM.
-
-```bash
-POST /ask
+POST /recommend
 Content-Type: application/json
 
 {
-  "question": "Tell me about Galaxy S24 Ultra camera"
+  "question": "What Samsung phone should I buy for photography?"
 }
 ```
 
-**Response:**
+## API Response Example
+
 ```json
 {
   "phone_model": "Galaxy S24 Ultra",
-  "specs": {...},
-  "review": "AI-generated response from Groq",
-  "status": "success"
+  "specs": {
+    "display": "6.8\" AMOLED 120Hz",
+    "camera": "200MP main camera",
+    "battery": "5000mAh",
+    "storage": "512GB",
+    "price": "$1299"
+  },
+  "review": "The Galaxy S24 Ultra is perfect for photography enthusiasts with its advanced computational photography and AI features..."
 }
 ```
 
-### `/llm` - Direct LLM Endpoint
-Send any prompt to LLM and get response.
+## How It Works
 
-```bash
-POST /llm
-Content-Type: application/json
+1. **User Query**: User sends a question about Samsung phones
+2. **Model Extraction**: Regex patterns extract phone model names from the query
+3. **Database Lookup**: Fetch phone specifications from PostgreSQL
+4. **AI Analysis**: Google Gemini analyzes the query and specifications
+5. **Response**: Return personalized recommendation with specs and review
 
-{
-  "prompt": "Explain why Galaxy S24 Ultra is good for photography",
-  "model": "mixtral-8x7b-32768",
-  "max_tokens": 256,
-  "temperature": 0.7
-}
-```
+## Database Schema
 
-### `/llm/demo` - Demo Endpoint
-Test without using any API quota.
+The `phones` table contains:
+- `id` (INTEGER, PRIMARY KEY)
+- `model_name` (TEXT, UNIQUE)
+- `display` (TEXT)
+- `camera` (TEXT)
+- `battery` (TEXT)
+- `storage` (TEXT)
+- `price` (TEXT)
+- `color` (TEXT)
 
-```bash
-POST /llm/demo
-Content-Type: application/json
+## Environment Variables
 
-{
-  "prompt": "Any question here"
-}
-```
-
-**Response:**
-```json
-{
-  "response": "[DEMO MODE] Sample response...",
-  "demo": true
-}
-```
-
-### `/test/openai` - Diagnostics
-Check if your configured LLM provider is working.
-
-```bash
-GET /test/openai
-```
-
-Returns detailed status and troubleshooting info.
-
-## 🔧 Troubleshooting
-
-### "GROQ_API_KEY not set"
-→ Add `GROQ_API_KEY=gsk_...` to `.env` and restart server
-
-### "OpenAI Quota Exceeded"
-→ Switch to FREE Groq (set `LLM_PROVIDER=groq`)
-
-### API not responding
-→ Run: `curl http://localhost:8000/test/openai`
-
-## 📖 Development
-
-### Install development tools
-```bash
-pip install pytest pytest-asyncio black flake8
-```
-
-### Format code
-```bash
-black .
-```
-
-### Lint code
-```bash
-flake8 .
-```
-
-## 💡 Why Groq is Recommended
-
-| Feature | Groq | OpenAI |
-|---------|------|--------|
-| **Cost** | FREE ✅ | PAID |
-| **Credit Card** | NOT needed ✅ | Required |
-| **Speed** | ⚡ Very Fast | Good |
-| **Model** | Mixtral 8x7B | GPT-4o-mini |
-| **Setup** | 30 seconds | Requires billing |
-
-## License
-
-MIT License
-
-
-### API Documentation
-
-Once the server is running, you can access:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
-
-### Project Structure
-
-```
-.
-├── main.py                 # Main application file
-├── requirements.txt        # Python dependencies
-├── .gitignore             # Git ignore file
-└── README.md              # This file
-```
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_API_KEY` | Your Google Generative AI API key |
+| `DB_NAME` | PostgreSQL database name |
+| `DB_USER` | PostgreSQL username |
+| `DB_PASSWORD` | PostgreSQL password |
+| `DB_HOST` | PostgreSQL host (default: localhost) |
 
 ## Development
 
-### Install development tools (optional)
+### Running Tests
 ```bash
-pip install pytest pytest-asyncio black flake8
+pytest tests/
 ```
 
-### Run tests
-```bash
-pytest
-```
+### Code Structure
 
-### Format code
-```bash
-black .
-```
+- **main.py**: Handles FastAPI endpoints and request processing
+- **db_setup.py**: Database connection and query functions
+- **scraper.py**: Web scraping utilities for data collection
 
-### Lint code
-```bash
-flake8 .
-```
+## Future Enhancements
+
+- [ ] Add comparison feature for multiple phones
+- [ ] Implement user preference learning
+- [ ] Add price tracking functionality
+- [ ] Expand AI model capabilities
+- [ ] Add caching for improved performance
+
+## Troubleshooting
+
+### Database Connection Error
+Ensure PostgreSQL is running and credentials in `.env` are correct
+
+### API Key Error
+Verify `GOOGLE_API_KEY` is set in `.env` file
+
+### Port Already in Use
+Change port in startup command: `uvicorn main:app --port 8001`
 
 ## License
 
-MIT License
+This project is licensed under the MIT License - see LICENSE file for details
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## Support
+
+For issues or questions, please open an issue on the repository.
+
+---
+
+**Last Updated**: February 5, 2026
