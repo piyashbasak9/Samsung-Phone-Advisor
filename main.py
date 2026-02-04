@@ -117,7 +117,112 @@ def fetch_phone_specs(model_name: str) -> dict:
 
 
 
+# AGENT 2: REVIEW GENERATOR
 
+
+def call_llm_api(phone_specs: dict, user_question: str) -> str:
+    
+    print("[AGENT 2] Generating review using LLM...")
+    
+    # Build context for LLM
+    specs_text = f"""
+    Model: {phone_specs['model_name']}
+    Display: {phone_specs['display']}
+    Battery: {phone_specs['battery']}
+    Camera: {phone_specs['camera']}
+    RAM: {phone_specs['ram']}
+    Storage: {phone_specs['storage']}
+    Price: {phone_specs['price']}
+    """
+    
+    # LLM Prompt
+    prompt = f"""
+    You are a helpful Samsung phone advisor. Here are the specifications for a phone:
+    
+    {specs_text}
+    
+    User's Question: {user_question}
+    
+    Provide a concise, natural language response that answers the user's question based on these specs.
+    Be friendly, informative, and highlight key features relevant to the user's inquiry.
+    Keep the response to 2-3 sentences maximum.
+    """
+    
+    # Check if OpenAI API key is available
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    
+    if openai_api_key:
+        # Use actual OpenAI API (requires 'openai' package)
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=openai_api_key)
+            
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=150,
+                temperature=0.7
+            )
+            
+            review = response.choices[0].message.content.strip()
+            print("[AGENT 2] ✓ Review generated via OpenAI API")
+            return review
+            
+        except ImportError:
+            print("[AGENT 2] ⚠ OpenAI package not installed, using placeholder")
+        except Exception as e:
+            print(f"[AGENT 2] ⚠ OpenAI API error: {e}, using placeholder")
+    
+    # Placeholder LLM response (fallback)
+    review = generate_placeholder_review(phone_specs, user_question)
+    print("[AGENT 2] ✓ Review generated (placeholder mode)")
+    return review
+
+
+def generate_placeholder_review(phone_specs: dict, user_question: str) -> str:
+    """
+    Placeholder review generator (when OpenAI API is not available)
+    
+    Generates contextual reviews based on specs and user question
+    
+    Args:
+        phone_specs: Dictionary with phone specifications
+        user_question: Original user question
+    
+    Returns:
+        Generated review text
+    """
+    model = phone_specs['model_name']
+    display = phone_specs['display']
+    camera = phone_specs['camera']
+    battery = phone_specs['battery']
+    price = phone_specs['price']
+    
+    # Simple contextual responses
+    if 'camera' in user_question.lower() or 'photo' in user_question.lower():
+        return (f"The {model} features an excellent {camera} camera setup, making it ideal for photography enthusiasts. "
+                f"With its premium sensor and computational photography, it delivers stunning images in various lighting conditions.")
+    
+    elif 'battery' in user_question.lower() or 'charge' in user_question.lower():
+        return (f"The {model} comes with {battery}, ensuring excellent daily battery life. "
+                f"The fast charging capability means you can get back to using your phone quickly.")
+    
+    elif 'display' in user_question.lower() or 'screen' in user_question.lower():
+        return (f"The {model} boasts a beautiful {display} display that provides vibrant colors and smooth scrolling. "
+                f"This makes it perfect for watching content and gaming.")
+    
+    elif 'price' in user_question.lower() or 'cost' in user_question.lower() or 'value' in user_question.lower():
+        return (f"At {price}, the {model} offers excellent value with premium specs including {display} and {camera}. "
+                f"It's a solid investment for anyone looking for a high-end Samsung experience.")
+    
+    elif 'review' in user_question.lower() or 'opinion' in user_question.lower():
+        return (f"The {model} is an excellent smartphone featuring {display}, {camera}, and {battery}. "
+                f"At {price}, it represents Samsung's commitment to premium features and reliable performance.")
+    
+    else:
+        # Default response
+        return (f"The {model} is a fantastic choice with impressive specifications including {display}, "
+                f"{camera}, and {battery}. Priced at {price}, it offers great value and performance.")
 
 
 
