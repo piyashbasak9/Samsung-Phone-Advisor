@@ -1,8 +1,8 @@
-fastapi==0.104.1
-uvicorn==0.24.0
-pydantic==2.5.0
-psycopg2-binary==2.9.9
-requests==2.31.0
-beautifulsoup4==4.12.2
-python-dotenv==1.0.0
-groq==0.4.2
+fastapi
+uvicorn
+psycopg2-binary
+google-generativeai
+python-dotenv
+requests
+beautifulsoup4
+pydantic

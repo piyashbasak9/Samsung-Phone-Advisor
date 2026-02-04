@@ -1,339 +1,78 @@
+from db_setup import get_db_connection, create_table
 
+def seed_database():
+    # 1. Re-create the table with the new 'color' column
+    create_table()
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # 2. 30 Premium Samsung Phones Data
+    # Format: (Model, Display, Camera, Battery, Storage, Price, Color)
+    phones = [
+        # --- S24 Series ---
+        ("Samsung Galaxy S24 Ultra", "6.8-inch Dynamic LTPO AMOLED 2X", "200MP Main, 50MP Periscope", "5000 mAh, 45W", "256GB/512GB/1TB", "$1299", "Titanium Gray, Titanium Black, Titanium Violet, Titanium Yellow"),
+        ("Samsung Galaxy S24 Plus", "6.7-inch Dynamic LTPO AMOLED 2X", "50MP Main, 10MP Telephoto", "4900 mAh, 45W", "256GB/512GB", "$999", "Onyx Black, Marble Grey, Cobalt Violet, Amber Yellow"),
+        ("Samsung Galaxy S24", "6.2-inch Dynamic LTPO AMOLED 2X", "50MP Main, 10MP Telephoto", "4000 mAh, 25W", "128GB/256GB/512GB", "$799", "Onyx Black, Marble Grey, Cobalt Violet, Amber Yellow"),
+        
+        # --- Z Fold & Flip 6/5 Series ---
+        ("Samsung Galaxy Z Fold 6", "7.6-inch Foldable Dynamic AMOLED 2X", "50MP Main, 10MP Telephoto", "4400 mAh, 25W", "256GB/512GB/1TB", "$1899", "Silver Shadow, Pink, Navy, Crafted Black, White"),
+        ("Samsung Galaxy Z Flip 6", "6.7-inch Foldable Dynamic AMOLED 2X", "50MP Main, 12MP Ultrawide", "4000 mAh, 25W", "256GB/512GB", "$1099", "Yellow, Silver Shadow, Mint, Blue, Peach"),
+        ("Samsung Galaxy Z Fold 5", "7.6-inch Foldable Dynamic AMOLED 2X", "50MP Main, 10MP Telephoto", "4400 mAh, 25W", "256GB/512GB/1TB", "$1799", "Icy Blue, Phantom Black, Cream, Gray, Blue"),
+        ("Samsung Galaxy Z Flip 5", "6.7-inch Foldable Dynamic AMOLED 2X", "12MP Main, 12MP Ultrawide", "3700 mAh, 25W", "256GB/512GB", "$999", "Mint, Graphite, Cream, Lavender, Gray"),
 
-import requests
-from bs4 import BeautifulSoup
-from db_setup import insert_smartphone
-import time
+        # --- S23 Series ---
+        ("Samsung Galaxy S23 Ultra", "6.8-inch Dynamic AMOLED 2X", "200MP Main, 10MP Telephoto", "5000 mAh, 45W", "256GB/512GB/1TB", "$1199", "Phantom Black, Green, Cream, Lavender, Graphite"),
+        ("Samsung Galaxy S23 Plus", "6.6-inch Dynamic AMOLED 2X", "50MP Main, 10MP Telephoto", "4700 mAh, 45W", "256GB/512GB", "$999", "Phantom Black, Cream, Green, Lavender"),
+        ("Samsung Galaxy S23", "6.1-inch Dynamic AMOLED 2X", "50MP Main, 10MP Telephoto", "3900 mAh, 25W", "128GB/256GB", "$799", "Phantom Black, Cream, Green, Lavender"),
+        ("Samsung Galaxy S23 FE", "6.4-inch Dynamic AMOLED 2X", "50MP Main, 8MP Telephoto", "4500 mAh, 25W", "128GB/256GB", "$599", "Mint, Cream, Graphite, Purple, Indigo"),
 
-# Sample Samsung phones data (simulated scraping from a phone specification site)
-SAMPLE_PHONES = [
-    {
-        'model_name': 'Samsung Galaxy S24 Ultra',
-        'display': '6.8 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '5000 mAh, 45W fast charging',
-        'camera': '200MP main, 12MP ultra-wide, 10MP 3x telephoto, 10MP 10x periscope telephoto',
-        'ram': '12GB',
-        'storage': '256GB / 512GB / 1TB',
-        'price': '$1299'
-    },
-    {
-        'model_name': 'Samsung Galaxy S24 Plus',
-        'display': '6.7 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '4900 mAh, 45W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 10MP 3x telephoto',
-        'ram': '12GB',
-        'storage': '256GB / 512GB',
-        'price': '$999'
-    },
-    {
-        'model_name': 'Samsung Galaxy S24',
-        'display': '6.2 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '4000 mAh, 25W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 10MP 3x telephoto',
-        'ram': '8GB / 12GB',
-        'storage': '128GB / 256GB',
-        'price': '$799'
-    },
-    {
-        'model_name': 'Samsung Galaxy S23 Ultra',
-        'display': '6.8 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '5000 mAh, 45W fast charging',
-        'camera': '200MP main, 12MP ultra-wide, 10MP 3x telephoto, 10MP 10x periscope',
-        'ram': '8GB / 12GB',
-        'storage': '256GB / 512GB / 1TB',
-        'price': '$999'
-    },
-    {
-        'model_name': 'Samsung Galaxy S23 Plus',
-        'display': '6.6 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '4700 mAh, 45W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 10MP 3x telephoto',
-        'ram': '8GB',
-        'storage': '256GB / 512GB',
-        'price': '$899'
-    },
-    {
-        'model_name': 'Samsung Galaxy S23',
-        'display': '6.1 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '3900 mAh, 25W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 10MP 3x telephoto',
-        'ram': '8GB',
-        'storage': '128GB / 256GB',
-        'price': '$799'
-    },
-    {
-        'model_name': 'Samsung Galaxy Z Fold 5',
-        'display': '7.6 inches main, 6.2 inches cover, Dynamic AMOLED 2X, 120Hz',
-        'battery': '4400 mAh, 25W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 10MP telephoto',
-        'ram': '12GB',
-        'storage': '256GB / 512GB / 1TB',
-        'price': '$1799'
-    },
-    {
-        'model_name': 'Samsung Galaxy Z Flip 5',
-        'display': '6.7 inches main, 3.4 inches cover, Dynamic AMOLED 2X, 120Hz',
-        'battery': '3700 mAh, 25W fast charging',
-        'camera': '12MP main, 12MP ultra-wide',
-        'ram': '8GB',
-        'storage': '256GB / 512GB',
-        'price': '$999'
-    },
-    {
-        'model_name': 'Samsung Galaxy A54 5G',
-        'display': '6.4 inches Super AMOLED, 120Hz',
-        'battery': '5000 mAh, 25W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 5MP macro',
-        'ram': '6GB / 8GB',
-        'storage': '128GB / 256GB',
-        'price': '$449'
-    },
-    {
-        'model_name': 'Samsung Galaxy A34 5G',
-        'display': '6.6 inches Super AMOLED, 120Hz',
-        'battery': '5000 mAh, 25W fast charging',
-        'camera': '48MP main, 8MP ultra-wide, 5MP macro',
-        'ram': '6GB / 8GB',
-        'storage': '128GB / 256GB',
-        'price': '$349'
-    },
-    {
-        'model_name': 'Samsung Galaxy A15 5G',
-        'display': '6.5 inches Super AMOLED, 90Hz',
-        'battery': '5000 mAh, 25W fast charging',
-        'camera': '50MP main, 5MP ultra-wide, 2MP macro',
-        'ram': '4GB / 6GB / 8GB',
-        'storage': '128GB',
-        'price': '$199'
-    },
-    {
-        'model_name': 'Samsung Galaxy M54 5G',
-        'display': '6.7 inches Super AMOLED Plus, 120Hz',
-        'battery': '6000 mAh, 25W fast charging',
-        'camera': '108MP main, 8MP ultra-wide, 2MP macro',
-        'ram': '8GB',
-        'storage': '128GB / 256GB',
-        'price': '$399'
-    },
-    {
-        'model_name': 'Samsung Galaxy M34 5G',
-        'display': '6.5 inches Super AMOLED, 120Hz',
-        'battery': '6000 mAh, 25W fast charging',
-        'camera': '50MP main, 8MP ultra-wide, 2MP macro',
-        'ram': '6GB / 8GB',
-        'storage': '128GB',
-        'price': '$279'
-    },
-    {
-        'model_name': 'Samsung Galaxy F54 5G',
-        'display': '6.7 inches Super AMOLED Plus, 120Hz',
-        'battery': '6000 mAh, 25W fast charging',
-        'camera': '108MP main, 8MP ultra-wide, 2MP macro',
-        'ram': '8GB',
-        'storage': '256GB',
-        'price': '$369'
-    },
-    {
-        'model_name': 'Samsung Galaxy S21 FE 5G',
-        'display': '6.4 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '4500 mAh, 25W fast charging',
-        'camera': '12MP main, 12MP ultra-wide, 8MP telephoto',
-        'ram': '6GB / 8GB',
-        'storage': '128GB / 256GB',
-        'price': '$599'
-    },
-    {
-        'model_name': 'Samsung Galaxy Note 20 Ultra',
-        'display': '6.9 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '4500 mAh, 25W fast charging',
-        'camera': '108MP main, 12MP ultra-wide, 12MP periscope telephoto',
-        'ram': '12GB',
-        'storage': '128GB / 256GB / 512GB',
-        'price': '$849'
-    },
-    {
-        'model_name': 'Samsung Galaxy Z Fold 4',
-        'display': '7.6 inches main, 6.2 inches cover, Dynamic AMOLED 2X, 120Hz',
-        'battery': '4400 mAh, 25W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 10MP telephoto',
-        'ram': '12GB',
-        'storage': '256GB / 512GB / 1TB',
-        'price': '$1499'
-    },
-    {
-        'model_name': 'Samsung Galaxy Z Flip 4',
-        'display': '6.7 inches main, 1.9 inches cover, Dynamic AMOLED, 120Hz',
-        'battery': '3700 mAh, 25W fast charging',
-        'camera': '12MP main, 12MP ultra-wide',
-        'ram': '8GB',
-        'storage': '128GB / 256GB / 512GB',
-        'price': '$899'
-    },
-    {
-        'model_name': 'Samsung Galaxy A73 5G',
-        'display': '6.7 inches Super AMOLED Plus, 120Hz',
-        'battery': '5000 mAh, 25W fast charging',
-        'camera': '108MP main, 12MP ultra-wide, 5MP macro, 5MP depth',
-        'ram': '6GB / 8GB',
-        'storage': '128GB / 256GB',
-        'price': '$469'
-    },
-    {
-        'model_name': 'Samsung Galaxy A53 5G',
-        'display': '6.5 inches Super AMOLED, 120Hz',
-        'battery': '5000 mAh, 25W fast charging',
-        'camera': '64MP main, 12MP ultra-wide, 5MP macro, 5MP depth',
-        'ram': '4GB / 6GB / 8GB',
-        'storage': '128GB / 256GB',
-        'price': '$349'
-    },
-    {
-        'model_name': 'Samsung Galaxy A14 5G',
-        'display': '6.6 inches PLS LCD, 90Hz',
-        'battery': '5000 mAh, 15W charging',
-        'camera': '50MP main, 2MP macro, 2MP depth',
-        'ram': '4GB / 6GB',
-        'storage': '64GB / 128GB',
-        'price': '$179'
-    },
-    {
-        'model_name': 'Samsung Galaxy M14 5G',
-        'display': '6.6 inches PLS LCD, 90Hz',
-        'battery': '6000 mAh, 25W fast charging',
-        'camera': '50MP main, 2MP macro, 2MP depth',
-        'ram': '4GB / 6GB',
-        'storage': '64GB / 128GB',
-        'price': '$189'
-    },
-    {
-        'model_name': 'Samsung Galaxy F14 5G',
-        'display': '6.6 inches PLS LCD, 90Hz',
-        'battery': '6000 mAh, 25W fast charging',
-        'camera': '50MP main, 2MP macro, 2MP depth',
-        'ram': '4GB / 6GB',
-        'storage': '64GB / 128GB',
-        'price': '$179'
-    },
-    {
-        'model_name': 'Samsung Galaxy S22 Ultra',
-        'display': '6.8 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '5000 mAh, 45W fast charging',
-        'camera': '108MP main, 12MP ultra-wide, 10MP 3x telephoto, 10MP 10x periscope',
-        'ram': '8GB / 12GB',
-        'storage': '128GB / 256GB / 512GB / 1TB',
-        'price': '$849'
-    },
-    {
-        'model_name': 'Samsung Galaxy S22 Plus',
-        'display': '6.6 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '4500 mAh, 45W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 10MP telephoto',
-        'ram': '8GB',
-        'storage': '128GB / 256GB',
-        'price': '$749'
-    },
-    {
-        'model_name': 'Samsung Galaxy S22',
-        'display': '6.1 inches Dynamic AMOLED 2X, 120Hz',
-        'battery': '3700 mAh, 25W fast charging',
-        'camera': '50MP main, 12MP ultra-wide, 10MP telephoto',
-        'ram': '8GB',
-        'storage': '128GB / 256GB',
-        'price': '$699'
-    },
-    {
-        'model_name': 'Samsung Galaxy XCover 6 Pro',
-        'display': '6.6 inches TFT, 120Hz',
-        'battery': '4050 mAh, removable, 25W fast charging',
-        'camera': '50MP main, 8MP ultra-wide',
-        'ram': '6GB',
-        'storage': '128GB',
-        'price': '$599'
-    },
-    {
-        'model_name': 'Samsung Galaxy A05s',
-        'display': '6.7 inches PLS LCD, 90Hz',
-        'battery': '5000 mAh, 25W fast charging',
-        'camera': '50MP main, 2MP macro, 2MP depth',
-        'ram': '4GB / 6GB',
-        'storage': '64GB / 128GB',
-        'price': '$149'
-    },
-    {
-        'model_name': 'Samsung Galaxy M13',
-        'display': '6.6 inches PLS LCD, 60Hz',
-        'battery': '5000 mAh, 15W charging',
-        'camera': '50MP main, 5MP ultra-wide, 2MP macro',
-        'ram': '4GB / 6GB',
-        'storage': '64GB / 128GB',
-        'price': '$139'
-    },
-    {
-        'model_name': 'Samsung Galaxy F04',
-        'display': '6.5 inches PLS LCD, 60Hz',
-        'battery': '5000 mAh, 10W charging',
-        'camera': '13MP main, 2MP depth',
-        'ram': '4GB',
-        'storage': '64GB',
-        'price': '$99'
-    }
-]
+        # --- Z Fold & Flip 4 Series ---
+        ("Samsung Galaxy Z Fold 4", "7.6-inch Foldable Dynamic AMOLED 2X", "50MP Main, 10MP Telephoto", "4400 mAh, 25W", "256GB/512GB/1TB", "$1499", "Graygreen, Phantom Black, Beige, Burgundy"),
+        ("Samsung Galaxy Z Flip 4", "6.7-inch Foldable Dynamic AMOLED 2X", "12MP Main, 12MP Ultrawide", "3700 mAh, 25W", "128GB/256GB/512GB", "$899", "Bora Purple, Graphite, Pink Gold, Blue"),
 
-def scrape_samsung_phones(url=None):
-    print("🔄 Starting scraper...")
-    
-    if url:
-        print(f"Attempting to scrape from: {url}")
-        # In production, implement actual web scraping here
-        # For now, we use sample data
-        phones = SAMPLE_PHONES
-    else:
-        print("Using sample Samsung phone data (demo mode)")
-        phones = SAMPLE_PHONES
-    
-    return phones
+        # --- S22 Series ---
+        ("Samsung Galaxy S22 Ultra", "6.8-inch Dynamic AMOLED 2X", "108MP Main, 10MP Periscope", "5000 mAh, 45W", "128GB/256GB/512GB/1TB", "$900", "Phantom Black, White, Burgundy, Green, Graphite"),
+        ("Samsung Galaxy S22 Plus", "6.6-inch Dynamic AMOLED 2X", "50MP Main, 10MP Telephoto", "4500 mAh, 45W", "128GB/256GB", "$700", "Phantom Black, White, Pink Gold, Green"),
+        ("Samsung Galaxy S22", "6.1-inch Dynamic AMOLED 2X", "50MP Main, 10MP Telephoto", "3700 mAh, 25W", "128GB/256GB", "$600", "Phantom Black, White, Pink Gold, Green"),
 
-def save_to_db():
-    print("\n" + "="*60)
-    print("Samsung Phone Advisor - Web Scraper")
-    print("="*60 + "\n")
+        # --- S21 Series ---
+        ("Samsung Galaxy S21 Ultra", "6.8-inch Dynamic AMOLED 2X", "108MP Main, 10MP Periscope", "5000 mAh, 25W", "128GB/256GB/512GB", "$800", "Phantom Black, Phantom Silver, Phantom Titanium"),
+        ("Samsung Galaxy S21 FE", "6.4-inch Dynamic AMOLED 2X", "12MP Main, 8MP Telephoto", "4500 mAh, 25W", "128GB/256GB", "$500", "White, Graphite, Lavender, Olive"),
+        ("Samsung Galaxy S21 Plus", "6.7-inch Dynamic AMOLED 2X", "12MP Main, 64MP Telephoto", "4800 mAh, 25W", "128GB/256GB", "$600", "Phantom Black, Phantom Silver, Phantom Violet"),
+
+        # --- Note Series (Legendary) ---
+        ("Samsung Galaxy Note 20 Ultra", "6.9-inch Dynamic AMOLED 2X", "108MP Main, 12MP Periscope", "4500 mAh, 25W", "256GB/512GB", "$850", "Mystic Bronze, Mystic Black, Mystic White"),
+        
+        # --- High-End A Series & Others ---
+        ("Samsung Galaxy A55", "6.6-inch Super AMOLED", "50MP Main, 12MP Ultrawide", "5000 mAh, 25W", "128GB/256GB", "$479", "Awesome Iceblue, Awesome Lilac, Awesome Navy"),
+        ("Samsung Galaxy A54", "6.4-inch Super AMOLED", "50MP Main, 12MP Ultrawide", "5000 mAh, 25W", "128GB/256GB", "$350", "Lime, Graphite, Violet, White"),
+        ("Samsung Galaxy A35", "6.6-inch Super AMOLED", "50MP Main, 8MP Ultrawide", "5000 mAh, 25W", "128GB/256GB", "$399", "Awesome Iceblue, Awesome Lilac, Awesome Navy"),
+        ("Samsung Galaxy A73 5G", "6.7-inch Super AMOLED Plus", "108MP Main, 12MP Ultrawide", "5000 mAh, 25W", "128GB/256GB", "$450", "Gray, Mint, White"),
+        ("Samsung Galaxy F55", "6.7-inch Super AMOLED Plus", "50MP Main, 8MP Ultrawide", "5000 mAh, 45W", "128GB/256GB", "$360", "Apricot Crush, Raisin Black"),
+        ("Samsung Galaxy M55", "6.7-inch Super AMOLED Plus", "50MP Main, 8MP Ultrawide", "5000 mAh, 45W", "128GB/256GB", "$330", "Denim Black, Light Green"),
+        ("Samsung Galaxy Quantum 4", "6.4-inch Super AMOLED", "50MP Main, 12MP Ultrawide", "5000 mAh, 25W", "128GB", "$450", "Graphite, White, Lime"),
+        ("Samsung Galaxy XCover 7", "6.6-inch PLS LCD", "50MP Main", "4050 mAh (Removable), 15W", "128GB", "$400", "Black"),
+        ("Samsung W24", "7.6-inch Foldable AMOLED", "50MP Main, 10MP Telephoto", "4400 mAh, 25W", "1TB", "$2200", "Gray, Gold (China Exclusive)"),
+        ("Samsung W24 Flip", "6.7-inch Foldable AMOLED", "12MP Main, 12MP Ultrawide", "3700 mAh, 25W", "512GB", "$1300", "White, Gold (China Exclusive)")
+    ]
     
-    # Scrape phone data
-    phones_data = scrape_samsung_phones()
+    print(f"Inserting {len(phones)} phones into database...")
     
-    print(f"\n✓ Found {len(phones_data)} phones\n")
-    
-    # Insert each phone into the database
-    for phone in phones_data:
+    for p in phones:
         try:
-            insert_smartphone(
-                model_name=phone['model_name'],
-                display=phone['display'],
-                battery=phone['battery'],
-                camera=phone['camera'],
-                ram=phone['ram'],
-                storage=phone['storage'],
-                price=phone['price']
-            )
-            time.sleep(0.2)  # Rate limiting
+            # Note: We added %s for the color column
+            cursor.execute("""
+                INSERT INTO phones (model_name, display, camera, battery, storage, price, color)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, p)
         except Exception as e:
-            print(f"✗ Error saving {phone['model_name']}: {e}")
-    
-    print("\n✓ Scraping and database insertion complete!")
-
-def scrape_with_bs4(url):
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.content, 'html.parser')
-        # Parse logic would go here based on target website structure
-        
-        return []
-    except Exception as e:
-        print(f"✗ Error scraping URL: {e}")
-        return []
+            print(f"Skipped {p[0]}: {e}")
+            
+    conn.commit()
+    cursor.close()
+    conn.close()
+    print("All 30 phones inserted successfully with colors!")
 
 if __name__ == "__main__":
-    # Run the scraper and save to database
-    save_to_db()
+    seed_database()
