@@ -1,3 +1,4 @@
+
 import psycopg2
 from psycopg2 import sql
 import os
@@ -21,7 +22,7 @@ def get_db_connection():
     except Exception as e:
         print(f"✗ Database connection failed: {e}")
         raise
-    
+
 def create_smartphones_table():
     """Create smartphones table with required columns"""
     conn = get_db_connection()
@@ -45,16 +46,15 @@ def create_smartphones_table():
         
         cursor.execute(create_table_query)
         conn.commit()
-        print(" Table 'smartphones' created successfully")
+        print("✓ Table 'smartphones' created successfully")
         
     except Exception as e:
         conn.rollback()
-        print(f" Error creating table: {e}")
+        print(f"✗ Error creating table: {e}")
         raise
     finally:
         cursor.close()
         conn.close()
-
 
 def drop_smartphones_table():
     """Drop smartphones table (for testing/cleanup)"""
@@ -64,10 +64,10 @@ def drop_smartphones_table():
     try:
         cursor.execute("DROP TABLE IF EXISTS smartphones CASCADE;")
         conn.commit()
-        print(" Table 'smartphones' dropped successfully")
+        print("✓ Table 'smartphones' dropped successfully")
     except Exception as e:
         conn.rollback()
-        print(f" Error dropping table: {e}")
+        print(f"✗ Error dropping table: {e}")
         raise
     finally:
         cursor.close()
@@ -86,18 +86,46 @@ def insert_smartphone(model_name, display, battery, camera, ram, storage, price)
         """
         cursor.execute(insert_query, (model_name, display, battery, camera, ram, storage, price))
         conn.commit()
-        print(f" Inserted: {model_name}")
+        print(f"✓ Inserted: {model_name}")
     except Exception as e:
         conn.rollback()
-        print(f" Error inserting {model_name}: {e}")
+        print(f"✗ Error inserting {model_name}: {e}")
     finally:
         cursor.close()
         conn.close()
 
+def fetch_phone_by_model(model_name):
+    """Fetch phone details by model name (case-insensitive)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        query = "SELECT * FROM smartphones WHERE model_name ILIKE %s;"
+        cursor.execute(query, (f'%{model_name}%',))
+        result = cursor.fetchall()
+        return result
+    except Exception as e:
+        print(f"✗ Error fetching phone: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()
 
-
-
-
+def get_all_phones():
+    """Fetch all phones from database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("SELECT * FROM smartphones;")
+        results = cursor.fetchall()
+        return results
+    except Exception as e:
+        print(f"✗ Error fetching all phones: {e}")
+        return None
+    finally:
+        cursor.close()
+        conn.close()
 
 if __name__ == "__main__":
     # Setup: Create table
