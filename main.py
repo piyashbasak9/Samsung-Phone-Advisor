@@ -17,6 +17,11 @@ import psycopg2
 # Load environment variables
 load_dotenv()
 
+# Detect which LLM provider to use
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'groq').lower()  # Default to Groq (free)
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Samsung Smart Phone Advisor",
@@ -143,41 +148,101 @@ def fetch_phone_specs(model_name: str) -> dict:
 # ============================================================================
 
 def call_openai_prompt(prompt: str, model: str | None = None, max_tokens: int = 256, temperature: float = 0.7, demo_mode: bool = False) -> str:
-    """Call OpenAI chat completion with a raw prompt and return text. If demo_mode=True, returns mock response."""
+    """
+    Call LLM API (supports Groq and OpenAI).
+    If demo_mode=True, returns mock response.
+    
+    Provider selection:
+    - Groq (FREE, default): Fastest free API, no credit card needed
+    - OpenAI (PAID): Requires valid API key and credits
+    """
     if demo_mode:
         return f"[DEMO MODE] This is a sample LLM response. In production, the model would analyze: '{prompt[:100]}...'"
     
-    openai_api_key = os.getenv('OPENAI_API_KEY')
-    if not openai_api_key:
-        raise RuntimeError("OPENAI_API_KEY is not set. Set it in your environment or .env file.")
-
-    use_model = model or os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
-
-    try:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=openai_api_key)
-        response = client.chat.completions.create(
-            model=use_model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-
-        text = response.choices[0].message.content.strip()
-        return text
-
-    except Exception as e:
-        error_msg = str(e)
-        if "insufficient_quota" in error_msg.lower() or "quota" in error_msg.lower():
+    provider = LLM_PROVIDER
+    
+    # ================================================================
+    # GROQ API (FREE - Default)
+    # ================================================================
+    if provider == 'groq':
+        api_key = GROQ_API_KEY
+        if not api_key:
             raise RuntimeError(
-                "OpenAI API quota exceeded. Please check your OpenAI account billing at https://platform.openai.com/account/billing/overview. "
-                "You can also use demo_mode=true for testing."
+                "GROQ_API_KEY is not set.\n\n"
+                "To use FREE Groq API:\n"
+                "1. Go to: https://console.groq.com/keys\n"
+                "2. Sign up (free, no credit card)\n"
+                "3. Create API key\n"
+                "4. Add to .env: GROQ_API_KEY=gsk_...\n"
+                "5. Restart server"
             )
-        elif "401" in error_msg or "unauthorized" in error_msg.lower():
-            raise RuntimeError("OpenAI API key is invalid. Please verify your OPENAI_API_KEY in .env")
-        else:
-            raise RuntimeError(f"OpenAI API call failed: {e}")
+        
+        try:
+            from groq import Groq
+            
+            client = Groq(api_key=api_key)
+            use_model = model or os.getenv('GROQ_MODEL', 'mixtral-8x7b-32768')
+            
+            response = client.chat.completions.create(
+                model=use_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            
+            text = response.choices[0].message.content.strip()
+            return text
+            
+        except ImportError:
+            raise RuntimeError(
+                "Groq library not installed. Run:\n"
+                "pip install groq"
+            )
+        except Exception as e:
+            error_msg = str(e)
+            if "401" in error_msg or "invalid" in error_msg.lower():
+                raise RuntimeError(f"Groq API key invalid. Check at: https://console.groq.com/keys")
+            else:
+                raise RuntimeError(f"Groq API error: {e}")
+    
+    # ================================================================
+    # OPENAI API (PAID)
+    # ================================================================
+    elif provider == 'openai':
+        api_key = OPENAI_API_KEY
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set. Set it in your environment or .env file.")
+        
+        try:
+            from openai import OpenAI
+            
+            client = OpenAI(api_key=api_key)
+            use_model = model or os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+            
+            response = client.chat.completions.create(
+                model=use_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            
+            text = response.choices[0].message.content.strip()
+            return text
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "insufficient_quota" in error_msg.lower() or "quota" in error_msg.lower():
+                raise RuntimeError(
+                    "OpenAI API quota exceeded. Check billing at: https://platform.openai.com/account/billing/overview"
+                )
+            elif "401" in error_msg or "unauthorized" in error_msg.lower():
+                raise RuntimeError("OpenAI API key is invalid.")
+            else:
+                raise RuntimeError(f"OpenAI API error: {e}")
+    
+    else:
+        raise RuntimeError(f"Unknown LLM_PROVIDER: {provider}. Use 'groq' or 'openai'")
+
 
 
 # ============================================================================
@@ -433,96 +498,156 @@ async def get_phone_details(model_name: str):
 
 @app.get("/test/openai", tags=["Testing"])
 async def test_openai_connection():
-    """Test if OpenAI API connection works and returns detailed diagnostics."""
+    """Test if LLM API connection works and returns detailed diagnostics.
+    
+    Supports both Groq (free) and OpenAI (paid).
+    Default provider: Groq (FREE, no credit card needed)
+    """
     import os
     from dotenv import load_dotenv
     
     load_dotenv()
     
-    api_key = os.getenv('OPENAI_API_KEY')
+    provider = os.getenv('LLM_PROVIDER', 'groq').lower()
     
-    if not api_key:
+    # ================================================================
+    # Test GROQ (FREE)
+    # ================================================================
+    if provider == 'groq':
+        groq_key = os.getenv('GROQ_API_KEY')
+        
+        if not groq_key:
+            return {
+                "status": "error",
+                "provider": "groq",
+                "message": "❌ GROQ_API_KEY not set",
+                "details": "Groq is FREE - no credit card needed!",
+                "next_steps": [
+                    "1. Go to: https://console.groq.com/keys",
+                    "2. Sign up (free)",
+                    "3. Create API key (starts with 'gsk_')",
+                    "4. Add to .env: GROQ_API_KEY=gsk_...",
+                    "5. Restart server"
+                ]
+            }
+        
+        try:
+            from groq import Groq
+            client = Groq(api_key=groq_key)
+            
+            response = client.chat.completions.create(
+                model="mixtral-8x7b-32768",
+                messages=[{"role": "user", "content": "Say 'OK' in one word"}],
+                max_tokens=10
+            )
+            
+            return {
+                "status": "success",
+                "provider": "groq",
+                "message": "✅ Groq API is working!",
+                "model": "mixtral-8x7b-32768",
+                "response": response.choices[0].message.content,
+                "key_preview": f"{groq_key[:10]}...",
+                "next_steps": ["Your /ask endpoint will now use Groq (FREE)"],
+                "info": "Groq is completely free - no credit card needed!"
+            }
+            
+        except ImportError:
+            return {
+                "status": "error",
+                "provider": "groq",
+                "message": "❌ Groq library not installed",
+                "next_steps": ["Run: pip install groq"]
+            }
+            
+        except Exception as e:
+            error_str = str(e)
+            if "401" in error_str:
+                return {
+                    "status": "error",
+                    "provider": "groq",
+                    "message": "❌ Invalid Groq API Key",
+                    "key_preview": f"{groq_key[:10]}...",
+                    "next_steps": [
+                        "1. Go to: https://console.groq.com/keys",
+                        "2. Check your API key format",
+                        "3. Create new key if needed"
+                    ]
+                }
+            else:
+                return {
+                    "status": "error",
+                    "provider": "groq",
+                    "message": f"❌ Groq API Error: {error_str[:100]}"
+                }
+    
+    # ================================================================
+    # Test OPENAI (PAID)
+    # ================================================================
+    elif provider == 'openai':
+        openai_key = os.getenv('OPENAI_API_KEY')
+        
+        if not openai_key:
+            return {
+                "status": "error",
+                "provider": "openai",
+                "message": "❌ OPENAI_API_KEY not set",
+                "next_steps": [
+                    "Set OPENAI_API_KEY in .env file",
+                    "⚠️ Note: OpenAI requires payment (not free)"
+                ]
+            }
+        
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=openai_key)
+            
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": "Say 'OK'"}],
+                max_tokens=10
+            )
+            
+            return {
+                "status": "success",
+                "provider": "openai",
+                "message": "✅ OpenAI API is working!",
+                "model": "gpt-4o-mini",
+                "response": response.choices[0].message.content,
+                "key_preview": f"{openai_key[:20]}...",
+                "next_steps": ["Your /ask endpoint will now use OpenAI"]
+            }
+            
+        except Exception as e:
+            error_str = str(e)
+            if "insufficient_quota" in error_str.lower():
+                return {
+                    "status": "error",
+                    "provider": "openai",
+                    "message": "❌ OpenAI Quota Exceeded",
+                    "next_steps": [
+                        "1. Check: https://platform.openai.com/account/billing/overview",
+                        "💡 Tip: Switch to FREE Groq API instead",
+                        "Set LLM_PROVIDER=groq in .env"
+                    ]
+                }
+            else:
+                return {
+                    "status": "error",
+                    "provider": "openai",
+                    "message": f"❌ OpenAI Error: {error_str[:100]}"
+                }
+    
+    else:
         return {
             "status": "error",
-            "message": "OPENAI_API_KEY not set in .env file",
+            "message": f"❌ Unknown LLM_PROVIDER: {provider}",
             "next_steps": [
-                "1. Add OPENAI_API_KEY to .env file",
-                "2. Restart the server",
-                "3. Try again"
+                "Set LLM_PROVIDER to 'groq' or 'openai' in .env",
+                "Recommended: groq (free)"
             ]
         }
-    
-    if not api_key.startswith('sk-'):
-        return {
-            "status": "error",
-            "message": "OPENAI_API_KEY format looks invalid (should start with 'sk-')",
-            "key_preview": f"{api_key[:10]}...",
-            "next_steps": ["Check your API key format"]
-        }
-    
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": "Say 'OK'"}],
-            max_tokens=10
-        )
-        
-        return {
-            "status": "success",
-            "message": "✓ OpenAI API is working perfectly!",
-            "model": "gpt-4o-mini",
-            "response": response.choices[0].message.content,
-            "key_preview": f"{api_key[:20]}...",
-            "next_steps": ["Your /ask endpoint should now work"]
-        }
-        
-    except Exception as e:
-        error_str = str(e)
-        
-        if "insufficient_quota" in error_str.lower() or "quota" in error_str.lower():
-            return {
-                "status": "error",
-                "message": "❌ OpenAI API Quota Exceeded",
-                "error_code": "insufficient_quota",
-                "details": "Your OpenAI account has no credits or has exceeded quota",
-                "key_preview": f"{api_key[:20]}...",
-                "next_steps": [
-                    "1. Go to: https://platform.openai.com/account/billing/overview",
-                    "2. Check your quota and billing status",
-                    "3. Add a payment method if needed",
-                    "4. Wait a few minutes for quota to reset",
-                    "5. Try again"
-                ]
-            }
-        elif "401" in error_str or "invalid" in error_str.lower():
-            return {
-                "status": "error",
-                "message": "❌ Invalid API Key",
-                "error_code": "invalid_api_key",
-                "details": "The API key is invalid or expired",
-                "key_preview": f"{api_key[:20]}...",
-                "next_steps": [
-                    "1. Go to: https://platform.openai.com/api-keys",
-                    "2. Create a new API key or use an existing valid one",
-                    "3. Update OPENAI_API_KEY in .env",
-                    "4. Restart the server",
-                    "5. Try again"
-                ]
-            }
-        else:
-            return {
-                "status": "error",
-                "message": f"❌ OpenAI API Error",
-                "error": error_str[:200],
-                "key_preview": f"{api_key[:20]}...",
-                "next_steps": [
-                    "Check the error details above",
-                    "Visit: https://platform.openai.com/docs/guides/error-codes",
-                ]
-            }
+
 
 
 if __name__ == "__main__":

@@ -1,6 +1,14 @@
 # Samsung Phone Advisor API
 
-A FastAPI-based REST API for Samsung phone recommendations and advisement.
+A FastAPI-based REST API for Samsung phone recommendations powered by FREE Groq LLM (or OpenAI).
+
+## Key Features
+
+- 🚀 **Multi-LLM Support**: Groq (FREE) or OpenAI (PAID)
+- 💰 **Free Option**: Groq API requires NO credit card
+- ⚡ **Fast**: Groq is extremely fast (no credits needed)
+- 🤖 **AI-Powered**: LLM-generated responses only (no hardcoded answers)
+- 📱 **Samsung Focus**: Extract phone models and provide recommendations
 
 ## Project Setup
 
@@ -38,35 +46,103 @@ python main.py
 
 The API will be available at `http://localhost:8000`
 
-### Using the LLM endpoint
+## 🆓 Using FREE Groq LLM (Recommended)
 
-This project includes a direct LLM endpoint at `/llm` which forwards a prompt to an OpenAI model.
+Groq is **completely free** - no credit card needed!
 
-#### Setup
+### Step 1: Get Groq API Key
 
-1. Set your OpenAI API key in the environment or a `.env` file:
+1. Go to: https://console.groq.com/keys
+2. Sign up (free, takes 30 seconds)
+3. Create API key (it starts with `gsk_`)
+4. Copy the key
+
+### Step 2: Configure `.env`
+
+Edit `.env` file and add your Groq key:
+
+```env
+# LLM Provider Selection
+LLM_PROVIDER=groq
+
+# Groq API Configuration (FREE)
+GROQ_API_KEY=gsk_YOUR_KEY_HERE
+GROQ_MODEL=mixtral-8x7b-32768
+```
+
+### Step 3: Test Connection
 
 ```bash
-export OPENAI_API_KEY="sk-..."
-# optionally set a model name
-export OPENAI_MODEL="gpt-4o-mini"
+# Test Groq connection
+curl http://localhost:8000/test/openai
 ```
 
-Or add to `.env`:
+You should see: `"status": "success"`
+
+### Step 4: Use the `/ask` endpoint
+
+```bash
+curl -X POST http://localhost:8000/ask \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Tell me about Galaxy S24 Ultra camera"}'
 ```
-OPENAI_API_KEY=sk-...
+
+Now you'll get AI-generated responses using **FREE Groq**! ✅
+
+## 💳 Using Paid OpenAI (Optional)
+
+If you prefer OpenAI instead:
+
+### Step 1: Get OpenAI API Key
+
+1. Go to: https://platform.openai.com/api-keys
+2. Create API key
+3. Add payment method (credit/debit card)
+4. Copy your key
+
+### Step 2: Configure `.env`
+
+```env
+# Switch to OpenAI
+LLM_PROVIDER=openai
+
+# OpenAI Configuration
+OPENAI_API_KEY=sk-proj-YOUR_KEY_HERE
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-2. Run the server:
+### Step 3: Test Connection
 
 ```bash
-python main.py
+curl http://localhost:8000/test/openai
 ```
 
-#### Using the `/llm` endpoint (production)
+## 📚 API Endpoints
 
-Send a POST request with a prompt:
+### `/ask` - Main Advisor Endpoint
+Provides Samsung phone recommendations using LLM.
+
+```bash
+POST /ask
+Content-Type: application/json
+
+{
+  "question": "Tell me about Galaxy S24 Ultra camera"
+}
+```
+
+**Response:**
+```json
+{
+  "phone_model": "Galaxy S24 Ultra",
+  "specs": {...},
+  "review": "AI-generated response from Groq",
+  "status": "success"
+}
+```
+
+### `/llm` - Direct LLM Endpoint
+Send any prompt to LLM and get response.
 
 ```bash
 POST /llm
@@ -74,49 +150,83 @@ Content-Type: application/json
 
 {
   "prompt": "Explain why Galaxy S24 Ultra is good for photography",
-  "model": "gpt-4o-mini",
+  "model": "mixtral-8x7b-32768",
   "max_tokens": 256,
   "temperature": 0.7
 }
 ```
 
-**Response:**
-```json
-{
-  "model": "gpt-4o-mini",
-  "response": "...",
-  "demo": false
-}
-```
-
-#### Using the `/llm/demo` endpoint (for testing without quota usage)
-
-If you hit OpenAI API quota limits, use the demo endpoint to test your integration:
+### `/llm/demo` - Demo Endpoint
+Test without using any API quota.
 
 ```bash
 POST /llm/demo
 Content-Type: application/json
 
 {
-  "prompt": "Explain why Galaxy S24 Ultra is good for photography"
+  "prompt": "Any question here"
 }
 ```
 
 **Response:**
 ```json
 {
-  "model": "gpt-4o-mini",
-  "response": "[DEMO MODE] This is a sample LLM response...",
-  "demo": true,
-  "note": "This is a demo response. Use /llm endpoint for real API calls."
+  "response": "[DEMO MODE] Sample response...",
+  "demo": true
 }
 ```
 
-#### Error Handling
+### `/test/openai` - Diagnostics
+Check if your configured LLM provider is working.
 
-- **402 Payment Required**: OpenAI API quota exceeded. Check your [OpenAI billing](https://platform.openai.com/account/billing/overview).
-- **500 Internal Server Error**: Other API or configuration errors.
-- **OPENAI_API_KEY not set**: Set the key in `.env` or environment variables.
+```bash
+GET /test/openai
+```
+
+Returns detailed status and troubleshooting info.
+
+## 🔧 Troubleshooting
+
+### "GROQ_API_KEY not set"
+→ Add `GROQ_API_KEY=gsk_...` to `.env` and restart server
+
+### "OpenAI Quota Exceeded"
+→ Switch to FREE Groq (set `LLM_PROVIDER=groq`)
+
+### API not responding
+→ Run: `curl http://localhost:8000/test/openai`
+
+## 📖 Development
+
+### Install development tools
+```bash
+pip install pytest pytest-asyncio black flake8
+```
+
+### Format code
+```bash
+black .
+```
+
+### Lint code
+```bash
+flake8 .
+```
+
+## 💡 Why Groq is Recommended
+
+| Feature | Groq | OpenAI |
+|---------|------|--------|
+| **Cost** | FREE ✅ | PAID |
+| **Credit Card** | NOT needed ✅ | Required |
+| **Speed** | ⚡ Very Fast | Good |
+| **Model** | Mixtral 8x7B | GPT-4o-mini |
+| **Setup** | 30 seconds | Requires billing |
+
+## License
+
+MIT License
+
 
 ### API Documentation
 
