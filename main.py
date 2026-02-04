@@ -1,3 +1,10 @@
+"""
+Samsung Smart Phone Advisor - FastAPI Backend
+Multi-Agent System for intelligent phone recommendations and reviews
+
+Agent 1: Data Extractor - Detects phone model and retrieves specs from DB
+Agent 2: Review Generator - Generates natural language review using LLM
+"""
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -40,22 +47,22 @@ class AdviceResponse(BaseModel):
     status: str
 
 
-# LLM direct request model
-class LLMRequest(BaseModel):
-    prompt: str
-    model: str | None = None
-    max_tokens: int | None = 256
-    temperature: float | None = 0.7
-
-
-
-
-
-
-
+# ============================================================================
 # AGENT 1: DATA EXTRACTOR
+# ============================================================================
 
 def extract_phone_model(question: str) -> str:
+    """
+    Agent 1: Extract phone model name from user question
+    
+    Uses regex patterns to identify Samsung phone models from natural language
+    
+    Args:
+        question: User's question string
+    
+    Returns:
+        Detected phone model name or empty string if not found
+    """
     print(f"[AGENT 1] Extracting phone model from: {question}")
     
     # Common Samsung phone patterns
@@ -79,6 +86,17 @@ def extract_phone_model(question: str) -> str:
     return ""
 
 def fetch_phone_specs(model_name: str) -> dict:
+    """
+    Agent 1: Query database for phone specifications
+    
+    Executes SQL query to retrieve phone data from PostgreSQL
+    
+    Args:
+        model_name: Name of the phone model
+    
+    Returns:
+        Dictionary with phone specifications or None
+    """
     print(f"[AGENT 1] Querying database for: {model_name}")
     
     try:
@@ -120,102 +138,9 @@ def fetch_phone_specs(model_name: str) -> dict:
         return None
 
 
-
-# AGENT 2: REVIEW GENERATOR
-
-def call_llm_api(phone_specs: dict, user_question: str) -> str:
-    
-    print("[AGENT 2] Generating review using LLM...")
-    
-    # Build context for LLM
-    specs_text = f"""
-    Model: {phone_specs['model_name']}
-    Display: {phone_specs['display']}
-    Battery: {phone_specs['battery']}
-    Camera: {phone_specs['camera']}
-    RAM: {phone_specs['ram']}
-    Storage: {phone_specs['storage']}
-    Price: {phone_specs['price']}
-    """
-    
-    # LLM Prompt
-    prompt = f"""
-    You are a helpful Samsung phone advisor. Here are the specifications for a phone:
-    
-    {specs_text}
-    
-    User's Question: {user_question}
-    
-    Provide a concise, natural language response that answers the user's question based on these specs.
-    Be friendly, informative, and highlight key features relevant to the user's inquiry.
-    Keep the response to 2-3 sentences maximum.
-    """
-    
-    # Check if OpenAI API key is available
-    openai_api_key = os.getenv('OPENAI_API_KEY')
-    
-    if openai_api_key:
-        # Use actual OpenAI API (requires 'openai' package)
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=openai_api_key)
-            
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=150,
-                temperature=0.7
-            )
-            
-            review = response.choices[0].message.content.strip()
-            print("[AGENT 2] ✓ Review generated via OpenAI API")
-            return review
-            
-        except ImportError:
-            print("[AGENT 2] ⚠ OpenAI package not installed, using placeholder")
-        except Exception as e:
-            print(f"[AGENT 2] ⚠ OpenAI API error: {e}, using placeholder")
-    
-    # Placeholder LLM response (fallback)
-    review = generate_placeholder_review(phone_specs, user_question)
-    print("[AGENT 2] ✓ Review generated (placeholder mode)")
-    return review
-
-
-def generate_placeholder_review(phone_specs: dict, user_question: str) -> str:
-    model = phone_specs['model_name']
-    display = phone_specs['display']
-    camera = phone_specs['camera']
-    battery = phone_specs['battery']
-    price = phone_specs['price']
-    
-    # Simple contextual responses
-    if 'camera' in user_question.lower() or 'photo' in user_question.lower():
-        return (f"The {model} features an excellent {camera} camera setup, making it ideal for photography enthusiasts. "
-                f"With its premium sensor and computational photography, it delivers stunning images in various lighting conditions.")
-    
-    elif 'battery' in user_question.lower() or 'charge' in user_question.lower():
-        return (f"The {model} comes with {battery}, ensuring excellent daily battery life. "
-                f"The fast charging capability means you can get back to using your phone quickly.")
-    
-    elif 'display' in user_question.lower() or 'screen' in user_question.lower():
-        return (f"The {model} boasts a beautiful {display} display that provides vibrant colors and smooth scrolling. "
-                f"This makes it perfect for watching content and gaming.")
-    
-    elif 'price' in user_question.lower() or 'cost' in user_question.lower() or 'value' in user_question.lower():
-        return (f"At {price}, the {model} offers excellent value with premium specs including {display} and {camera}. "
-                f"It's a solid investment for anyone looking for a high-end Samsung experience.")
-    
-    elif 'review' in user_question.lower() or 'opinion' in user_question.lower():
-        return (f"The {model} is an excellent smartphone featuring {display}, {camera}, and {battery}. "
-                f"At {price}, it represents Samsung's commitment to premium features and reliable performance.")
-    
-    else:
-        # Default response
-        return (f"The {model} is a fantastic choice with impressive specifications including {display}, "
-                f"{camera}, and {battery}. Priced at {price}, it offers great value and performance.")
-
-
+# ============================================================================
+# Helper: OpenAI API Caller
+# ============================================================================
 
 def call_openai_prompt(prompt: str, model: str | None = None, max_tokens: int = 256, temperature: float = 0.7, demo_mode: bool = False) -> str:
     """Call OpenAI chat completion with a raw prompt and return text. If demo_mode=True, returns mock response."""
@@ -255,9 +180,127 @@ def call_openai_prompt(prompt: str, model: str | None = None, max_tokens: int = 
             raise RuntimeError(f"OpenAI API call failed: {e}")
 
 
+# ============================================================================
+# AGENT 2: REVIEW GENERATOR
+# ============================================================================
 
+def call_llm_api(phone_specs: dict, user_question: str) -> str:
+    """
+    Agent 2: Call LLM to generate natural language review
+    
+    Sends phone specifications to an LLM (OpenAI or placeholder)
+    to generate contextual reviews
+    
+    Args:
+        phone_specs: Dictionary with phone specifications
+        user_question: Original user question
+    
+    Returns:
+        Generated review text
+    """
+    print("[AGENT 2] Generating review using LLM...")
+    
+    # Build context for LLM
+    specs_text = f"""
+    Model: {phone_specs['model_name']}
+    Display: {phone_specs['display']}
+    Battery: {phone_specs['battery']}
+    Camera: {phone_specs['camera']}
+    RAM: {phone_specs['ram']}
+    Storage: {phone_specs['storage']}
+    Price: {phone_specs['price']}
+    """
+    
+    # LLM Prompt
+    prompt = f"""
+    You are a helpful Samsung phone advisor. Here are the specifications for a phone:
+    
+    {specs_text}
+    
+    User's Question: {user_question}
+    
+    Provide a concise, natural language response that answers the user's question based on these specs.
+    Be friendly, informative, and highlight key features relevant to the user's inquiry.
+    Keep the response to 2-3 sentences maximum.
+    """
+    
+    # Check if OpenAI API key is available
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    
+    if openai_api_key:
+        # Use actual OpenAI API (requires 'openai' package)
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=openai_api_key)
+            
+            # Use the centralized OpenAI function that handles errors properly
+            review = call_openai_prompt(
+                prompt,
+                model=os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                max_tokens=150,
+                temperature=0.7,
+                demo_mode=False
+            )
+            print("[AGENT 2] ✓ Review generated via OpenAI API")
+            return review
+            
+        except ImportError:
+            raise RuntimeError("OpenAI package not installed. Run: pip install openai")
+        except Exception as e:
+            raise RuntimeError(f"OpenAI API error: {e}")
+    else:
+        raise RuntimeError("OPENAI_API_KEY is not set in environment or .env file")
+
+
+def generate_placeholder_review(phone_specs: dict, user_question: str) -> str:
+    """
+    Placeholder review generator (when OpenAI API is not available)
+    
+    Generates contextual reviews based on specs and user question
+    
+    Args:
+        phone_specs: Dictionary with phone specifications
+        user_question: Original user question
+    
+    Returns:
+        Generated review text
+    """
+    model = phone_specs['model_name']
+    display = phone_specs['display']
+    camera = phone_specs['camera']
+    battery = phone_specs['battery']
+    price = phone_specs['price']
+    
+    # Simple contextual responses
+    if 'camera' in user_question.lower() or 'photo' in user_question.lower():
+        return (f"The {model} features an excellent {camera} camera setup, making it ideal for photography enthusiasts. "
+                f"With its premium sensor and computational photography, it delivers stunning images in various lighting conditions.")
+    
+    elif 'battery' in user_question.lower() or 'charge' in user_question.lower():
+        return (f"The {model} comes with {battery}, ensuring excellent daily battery life. "
+                f"The fast charging capability means you can get back to using your phone quickly.")
+    
+    elif 'display' in user_question.lower() or 'screen' in user_question.lower():
+        return (f"The {model} boasts a beautiful {display} display that provides vibrant colors and smooth scrolling. "
+                f"This makes it perfect for watching content and gaming.")
+    
+    elif 'price' in user_question.lower() or 'cost' in user_question.lower() or 'value' in user_question.lower():
+        return (f"At {price}, the {model} offers excellent value with premium specs including {display} and {camera}. "
+                f"It's a solid investment for anyone looking for a high-end Samsung experience.")
+    
+    elif 'review' in user_question.lower() or 'opinion' in user_question.lower():
+        return (f"The {model} is an excellent smartphone featuring {display}, {camera}, and {battery}. "
+                f"At {price}, it represents Samsung's commitment to premium features and reliable performance.")
+    
+    else:
+        # Default response
+        return (f"The {model} is a fantastic choice with impressive specifications including {display}, "
+                f"{camera}, and {battery}. Priced at {price}, it offers great value and performance.")
+
+
+# ============================================================================
 # FASTAPI ENDPOINTS
-
+# ============================================================================
 
 @app.get("/", tags=["Health"])
 async def root():
@@ -271,6 +314,26 @@ async def root():
 
 @app.post("/ask", response_model=AdviceResponse, tags=["Advisor"])
 async def ask_advisor(query: UserQuery):
+    """
+    Main endpoint for Samsung phone advice
+    
+    Orchestrates Agent 1 and Agent 2 to provide intelligent recommendations
+    
+    Flow:
+    1. Agent 1 extracts phone model from question
+    2. Agent 1 queries database for specs
+    3. Agent 2 generates natural language review
+    
+    Args:
+        query: UserQuery object with 'question' field
+    
+    Returns:
+        AdviceResponse with phone model, specs, and generated review
+    
+    Example:
+        POST /ask
+        {"question": "Tell me about the Galaxy S24 Ultra"}
+    """
     print(f"\n{'='*70}")
     print(f"User Question: {query.question}")
     print(f"{'='*70}\n")
@@ -295,8 +358,26 @@ async def ask_advisor(query: UserQuery):
                    "Please try another model or check the model name."
         )
     
-    # AGENT 2: Generate review
-    review = call_llm_api(specs, query.question)
+    # AGENT 2: Generate review (only LLM, no fallback)
+    try:
+        review = call_llm_api(specs, query.question)
+    except RuntimeError as e:
+        error_msg = str(e)
+        if "quota" in error_msg.lower():
+            raise HTTPException(
+                status_code=402,
+                detail=f"OpenAI API quota exceeded. {error_msg}"
+            )
+        elif "api_key" in error_msg.lower() or "not set" in error_msg.lower():
+            raise HTTPException(
+                status_code=500,
+                detail=f"OpenAI API key not configured. {error_msg}"
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"LLM error: {error_msg}"
+            )
     
     # Prepare response
     response = AdviceResponse(
@@ -348,59 +429,6 @@ async def get_phone_details(model_name: str):
         )
     
     return {"phone": specs}
-
-
-
-@app.post("/llm", tags=["LLM"])
-async def llm_query(req: LLMRequest):
-    """Direct LLM endpoint. Returns the model's text reply to a raw prompt.
-    
-    Use demo=true query parameter to test without hitting OpenAI API quota.
-    """
-    try:
-        # Check if demo mode is requested (for testing without quota issues)
-        import inspect
-        frame = inspect.currentframe()
-        demo_mode = False
-        
-        text = call_openai_prompt(
-            req.prompt, 
-            model=req.model, 
-            max_tokens=req.max_tokens or 256, 
-            temperature=req.temperature or 0.7,
-            demo_mode=demo_mode
-        )
-        return {
-            "model": req.model or os.getenv('OPENAI_MODEL', 'gpt-4o-mini'), 
-            "response": text,
-            "demo": False
-        }
-    except RuntimeError as e:
-        error_str = str(e)
-        # Return 402 for quota errors, 500 for other errors
-        status_code = 402 if "quota" in error_str.lower() else 500
-        raise HTTPException(status_code=status_code, detail=error_str)
-
-
-@app.post("/llm/demo", tags=["LLM"])
-async def llm_query_demo(req: LLMRequest):
-    """Demo LLM endpoint for testing without API quota usage.
-    
-    This returns a mock response to test the LLM integration without hitting OpenAI API.
-    """
-    text = call_openai_prompt(
-        req.prompt,
-        model=req.model,
-        max_tokens=req.max_tokens or 256,
-        temperature=req.temperature or 0.7,
-        demo_mode=True  # Force demo mode
-    )
-    return {
-        "model": req.model or os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
-        "response": text,
-        "demo": True,
-        "note": "This is a demo response. Use /llm endpoint for real API calls."
-    }
 
 
 if __name__ == "__main__":
