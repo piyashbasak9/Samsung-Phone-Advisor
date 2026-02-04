@@ -1,3 +1,4 @@
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import re
@@ -42,20 +43,22 @@ class AdviceResponse(BaseModel):
 
 
 
-#AGENT 1: DATA EXTRACTOR
+
+
+
+# AGENT 1: DATA EXTRACTOR
 
 def extract_phone_model(question: str) -> str:
-    
     print(f"[AGENT 1] Extracting phone model from: {question}")
     
     # Common Samsung phone patterns
     patterns = [
-        r'Galaxy\s+S\d+(?:\s+Ultra)?',  
-        r'Galaxy\s+Z\s+(?:Fold|Flip)\s+\d+',  
-        r'Galaxy\s+A\d+',  
-        r'Galaxy\s+Tab\s+S\d+',  
-        r'S\d+\s+Ultra', 
-        r'Z\s+(?:Fold|Flip)', 
+        r'Galaxy\s+S\d+(?:\s+Ultra)?',  # S24, S24 Ultra, etc.
+        r'Galaxy\s+Z\s+(?:Fold|Flip)\s+\d+',  # Fold 6, Flip 6, etc.
+        r'Galaxy\s+A\d+',  # A55, A35, etc.
+        r'Galaxy\s+Tab\s+S\d+',  # Tab S10, etc.
+        r'S\d+\s+Ultra',  # S23 Ultra
+        r'Z\s+(?:Fold|Flip)',  # Z Fold, Z Flip
     ]
     
     for pattern in patterns:
@@ -111,14 +114,7 @@ def fetch_phone_specs(model_name: str) -> dict:
 
 
 
-
-
-
-
-
-
 # AGENT 2: REVIEW GENERATOR
-
 
 def call_llm_api(phone_specs: dict, user_question: str) -> str:
     
@@ -180,18 +176,6 @@ def call_llm_api(phone_specs: dict, user_question: str) -> str:
 
 
 def generate_placeholder_review(phone_specs: dict, user_question: str) -> str:
-    """
-    Placeholder review generator (when OpenAI API is not available)
-    
-    Generates contextual reviews based on specs and user question
-    
-    Args:
-        phone_specs: Dictionary with phone specifications
-        user_question: Original user question
-    
-    Returns:
-        Generated review text
-    """
     model = phone_specs['model_name']
     display = phone_specs['display']
     camera = phone_specs['camera']
@@ -226,14 +210,6 @@ def generate_placeholder_review(phone_specs: dict, user_question: str) -> str:
 
 
 
-
-
-
-
-
-
-
-
 # FASTAPI ENDPOINTS
 
 
@@ -249,7 +225,6 @@ async def root():
 
 @app.post("/ask", response_model=AdviceResponse, tags=["Advisor"])
 async def ask_advisor(query: UserQuery):
-    
     print(f"\n{'='*70}")
     print(f"User Question: {query.question}")
     print(f"{'='*70}\n")
@@ -274,6 +249,9 @@ async def ask_advisor(query: UserQuery):
                    "Please try another model or check the model name."
         )
     
+    # AGENT 2: Generate review
+    review = call_llm_api(specs, query.question)
+    
     # Prepare response
     response = AdviceResponse(
         phone_model=specs['model_name'],
@@ -285,6 +263,7 @@ async def ask_advisor(query: UserQuery):
             'storage': specs['storage'],
             'price': specs['price']
         },
+        review=review,
         status="success"
     )
     
@@ -292,17 +271,37 @@ async def ask_advisor(query: UserQuery):
     return response
 
 
-
-@app.get("/phones")
+@app.get("/phones", tags=["Database"])
 async def list_all_phones():
     """Get all available phones in the database"""
-    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("SELECT model_name, price FROM smartphones ORDER BY model_name;")
+        results = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        phones = [{"model": row[0], "price": row[1]} for row in results]
+        return {"count": len(phones), "phones": phones}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-@app.get("/phones/{model_name}")
+@app.get("/phones/{model_name}", tags=["Database"])
 async def get_phone_details(model_name: str):
     """Get detailed specs for a specific phone"""
-  
+    specs = fetch_phone_specs(model_name)
+    
+    if not specs:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Phone model '{model_name}' not found in database"
+        )
+    
+    return {"phone": specs}
 
 
 if __name__ == "__main__":
@@ -310,6 +309,7 @@ if __name__ == "__main__":
     
     print("\n" + "="*70)
     print("Samsung Smart Phone Advisor - FastAPI Server")
+    print("="*70)
     print("\n🚀 Starting server on http://localhost:8000")
     print("📚 API Documentation: http://localhost:8000/docs")
     print("\n" + "="*70 + "\n")
