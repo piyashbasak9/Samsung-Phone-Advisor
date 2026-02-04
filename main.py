@@ -40,6 +40,13 @@ class AdviceResponse(BaseModel):
     status: str
 
 
+# LLM direct request model
+class LLMRequest(BaseModel):
+    prompt: str
+    model: str | None = None
+    max_tokens: int | None = 256
+    temperature: float | None = 0.7
+
 
 
 
@@ -210,6 +217,45 @@ def generate_placeholder_review(phone_specs: dict, user_question: str) -> str:
 
 
 
+def call_openai_prompt(prompt: str, model: str | None = None, max_tokens: int = 256, temperature: float = 0.7, demo_mode: bool = False) -> str:
+    """Call OpenAI chat completion with a raw prompt and return text. If demo_mode=True, returns mock response."""
+    if demo_mode:
+        return f"[DEMO MODE] This is a sample LLM response. In production, the model would analyze: '{prompt[:100]}...'"
+    
+    openai_api_key = os.getenv('OPENAI_API_KEY')
+    if not openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set. Set it in your environment or .env file.")
+
+    use_model = model or os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+
+    try:
+        from openai import OpenAI
+
+        client = OpenAI(api_key=openai_api_key)
+        response = client.chat.completions.create(
+            model=use_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+
+        text = response.choices[0].message.content.strip()
+        return text
+
+    except Exception as e:
+        error_msg = str(e)
+        if "insufficient_quota" in error_msg.lower() or "quota" in error_msg.lower():
+            raise RuntimeError(
+                "OpenAI API quota exceeded. Please check your OpenAI account billing at https://platform.openai.com/account/billing/overview. "
+                "You can also use demo_mode=true for testing."
+            )
+        elif "401" in error_msg or "unauthorized" in error_msg.lower():
+            raise RuntimeError("OpenAI API key is invalid. Please verify your OPENAI_API_KEY in .env")
+        else:
+            raise RuntimeError(f"OpenAI API call failed: {e}")
+
+
+
 # FASTAPI ENDPOINTS
 
 
@@ -302,6 +348,59 @@ async def get_phone_details(model_name: str):
         )
     
     return {"phone": specs}
+
+
+
+@app.post("/llm", tags=["LLM"])
+async def llm_query(req: LLMRequest):
+    """Direct LLM endpoint. Returns the model's text reply to a raw prompt.
+    
+    Use demo=true query parameter to test without hitting OpenAI API quota.
+    """
+    try:
+        # Check if demo mode is requested (for testing without quota issues)
+        import inspect
+        frame = inspect.currentframe()
+        demo_mode = False
+        
+        text = call_openai_prompt(
+            req.prompt, 
+            model=req.model, 
+            max_tokens=req.max_tokens or 256, 
+            temperature=req.temperature or 0.7,
+            demo_mode=demo_mode
+        )
+        return {
+            "model": req.model or os.getenv('OPENAI_MODEL', 'gpt-4o-mini'), 
+            "response": text,
+            "demo": False
+        }
+    except RuntimeError as e:
+        error_str = str(e)
+        # Return 402 for quota errors, 500 for other errors
+        status_code = 402 if "quota" in error_str.lower() else 500
+        raise HTTPException(status_code=status_code, detail=error_str)
+
+
+@app.post("/llm/demo", tags=["LLM"])
+async def llm_query_demo(req: LLMRequest):
+    """Demo LLM endpoint for testing without API quota usage.
+    
+    This returns a mock response to test the LLM integration without hitting OpenAI API.
+    """
+    text = call_openai_prompt(
+        req.prompt,
+        model=req.model,
+        max_tokens=req.max_tokens or 256,
+        temperature=req.temperature or 0.7,
+        demo_mode=True  # Force demo mode
+    )
+    return {
+        "model": req.model or os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+        "response": text,
+        "demo": True,
+        "note": "This is a demo response. Use /llm endpoint for real API calls."
+    }
 
 
 if __name__ == "__main__":
