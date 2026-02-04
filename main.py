@@ -25,3 +25,51 @@ async def health():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# FASTAPI ENDPOINTS
+
+
+@app.get("/")
+async def root():
+    """Health check endpoint"""
+    
+
+
+@app.post("/ask")
+async def ask_advisor():
+    """
+    Main endpoint for Samsung phone advice
+    
+    """
+
+
+@app.get("/phones")
+async def list_all_phones():
+    """Get all available phones in the database"""
+    
+
+
+@app.get("/phones/{model_name}")
+async def get_phone_details(model_name: str):
+    """Get detailed specs for a specific phone"""
+    

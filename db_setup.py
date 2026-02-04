@@ -45,15 +45,59 @@ def create_smartphones_table():
         
         cursor.execute(create_table_query)
         conn.commit()
-        print("✓ Table 'smartphones' created successfully")
+        print(" Table 'smartphones' created successfully")
         
     except Exception as e:
         conn.rollback()
-        print(f"✗ Error creating table: {e}")
+        print(f" Error creating table: {e}")
         raise
     finally:
         cursor.close()
         conn.close()
+
+
+def drop_smartphones_table():
+    """Drop smartphones table (for testing/cleanup)"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("DROP TABLE IF EXISTS smartphones CASCADE;")
+        conn.commit()
+        print(" Table 'smartphones' dropped successfully")
+    except Exception as e:
+        conn.rollback()
+        print(f" Error dropping table: {e}")
+        raise
+    finally:
+        cursor.close()
+        conn.close()
+
+def insert_smartphone(model_name, display, battery, camera, ram, storage, price):
+    """Insert a single smartphone record into the database"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        insert_query = """
+        INSERT INTO smartphones (model_name, display, battery, camera, ram, storage, price)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (model_name) DO NOTHING;
+        """
+        cursor.execute(insert_query, (model_name, display, battery, camera, ram, storage, price))
+        conn.commit()
+        print(f" Inserted: {model_name}")
+    except Exception as e:
+        conn.rollback()
+        print(f" Error inserting {model_name}: {e}")
+    finally:
+        cursor.close()
+        conn.close()
+
+
+
+
+
 
 if __name__ == "__main__":
     # Setup: Create table
