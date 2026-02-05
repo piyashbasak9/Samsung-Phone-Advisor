@@ -29,7 +29,7 @@ def get_ai_response(user_question):
     DATABASE:
     {db_context}
 
-    USER QUESTION: "{user_question}". Give and only based on USER QUESTION.
+    USER QUESTION: "{user_question}". Give and only based on USER QUESTION. Dont's lick any data without Requirements.
     """
     
     try:
@@ -42,9 +42,34 @@ def get_ai_response(user_question):
 # ALL API ROUTES
 
 
-@app.get("/")
+@app.get("/", tags=["Health"])
 def root():
-    return {"status": "Online", "mode": "Level-1 RAG"}
+    """
+    Service Dashboard: Displays project status and API guidelines.
+    """
+    return {
+        "project": "Samsung Smart Phone Advisor",
+        "developer": "Piyash Basak",
+        "status": "Online",
+        "version": "3.0.0",
+        "mode": "Level-1 RAG (Full Context)",
+        "database": "PostgreSQL (30 Premium Models Loaded)",
+        "capabilities": [
+            "Natural Language Recommendations",
+            "Side-by-side Phone Comparison",
+            "Price-based Filtering",
+            "Detailed Specifications Retrieval"
+        ],
+        "endpoints": {
+            "Documentation": "/docs",
+            "List All Phones": "/phones",
+            "Search Specific Phone": "/phones/{model_name}",
+            "Ask AI Assistant": "/ask (POST)"
+        },
+        "usage_example": {
+            "question": "Which Samsung phone has the best camera under $1000?"
+        }
+    }
 
 # Route 1: Get all phones (List)
 @app.get("/phones", tags=["Database"])
