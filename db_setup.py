@@ -14,7 +14,7 @@ def get_db_connection():
         )
         return conn
     except Exception as e:
-        print(f"Error connecting to database: {e}")
+        print(f"Database connection error: {e}")
         return None
 
 def create_table():
@@ -31,43 +31,35 @@ def create_table():
                 battery TEXT,
                 storage TEXT,
                 price TEXT,
-                color TEXT  -- New Column Added
+                color TEXT
             );
         """)
         conn.commit()
         cursor.close()
         conn.close()
-        print("Database table 'phones' created successfully.")
+        print("Table 'phones' created successfully.")
 
-# ... (fetch functions remain the same) ...
-def fetch_all_phones():
+def fetch_all_phones_full_data():
     conn = get_db_connection()
     if not conn: return []
     cursor = conn.cursor()
-    cursor.execute("SELECT model_name, price FROM phones ORDER BY model_name;")
+    cursor.execute("SELECT model_name, display, camera, battery, storage, price, color FROM phones;")
     rows = cursor.fetchall()
     cursor.close()
     conn.close()
-    return [{"model": row[0], "price": row[1]} for row in rows]
+    return [{
+        "model": r[0], "display": r[1], "camera": r[2], 
+        "battery": r[3], "storage": r[4], "price": r[5], "color": r[6]
+    } for r in rows]
 
 def fetch_phone_by_model(model_name: str):
     conn = get_db_connection()
     if not conn: return None
     cursor = conn.cursor()
-    query = """
-        SELECT id, model_name, display, camera, battery, storage, price, color
-        FROM phones
-        WHERE model_name ILIKE %s
-        LIMIT 1;
-    """
-    cursor.execute(query, (f'%{model_name}%',))
+    cursor.execute("SELECT * FROM phones WHERE model_name ILIKE %s LIMIT 1;", (f'%{model_name}%',))
     row = cursor.fetchone()
     cursor.close()
     conn.close()
     if row:
-        return {
-            'id': row[0], 'model_name': row[1], 'display': row[2],
-            'camera': row[3], 'battery': row[4], 'storage': row[5],
-            'price': row[6], 'color': row[7]
-        }
+        return {"id": row[0], "model_name": row[1], "display": row[2], "camera": row[3], "battery": row[4], "storage": row[5], "price": row[6], "color": row[7]}
     return None
